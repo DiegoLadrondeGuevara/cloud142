@@ -19,6 +19,7 @@ package:
   patterns:
     - '!**'
     - handler.py
+    - consumer.py
 
 functions:
   generarSensorTemp:
@@ -26,6 +27,16 @@ functions:
     handler: handler.lambda_handler
     events:
       - schedule: rate(1 minute)
+  insertarLecturaSensor:
+    name: semana14-sesion2-InsertarSensor-${sls:stage}
+    handler: consumer.lambda_handler
+    timeout: 5
+    environment:
+      SENSOR_TABLE_NAME: t_sensor_iot_FAB1
+    events:
+      - sqs:
+          arn: arn:aws:sqs:${aws:region}:904208419583:ColaSensorIoTFAB1
+          batchSize: 10
 
 resources:
   Resources:

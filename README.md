@@ -2,7 +2,9 @@
 
 El taller de clase ya tiene `TemaSensorIoT`, `ColaSensorIoTFAB1`, `t_sensor_iot_FAB1`, una Lambda que inserta las lecturas desde SQS y una Lambda que genera CO2. Este proyecto agrega el sensor `TEMP` para `FAB1` con lecturas aleatorias de **10 a 60 CELSIUS**. Publica las lecturas en el mismo tema SNS y añade una suscripción a **otro correo** para `tenant_id=FAB1`, `sensor_id=TEMP` y `medicion>40`.
 
-Serverless Framework v3 administra una Lambda nueva, su regla programada cada minuto y la suscripción de correo. Así se conserva la Lambda de CO2 creada en clase. La cola y la Lambda consumidora existentes reciben también TEMP por el filtro `tenant_id=FAB1` y lo insertan en la misma tabla. El proyecto usa `org: diegoladrondeguevara`, la cuenta `904208419583` y únicamente `arn:aws:iam::904208419583:role/LabRole` como rol de ejecución; la plantilla no crea roles IAM.
+Serverless Framework v3 administra la Lambda TEMP, su regla programada cada minuto y la suscripción de correo. Así se conserva la Lambda de CO2 creada en clase. La suscripción SQS existente recibe TEMP por el filtro `tenant_id=FAB1`.
+
+Durante la verificación se comprobó que el desencadenador SQS de la Lambda consumidora de clase está **Disabled**. Esta versión agrega una Lambda consumidora administrada por Serverless sobre **la misma cola**, que inserta todas las lecturas de cada lote en **la misma tabla**. No cambia el desencadenador de clase ni crea otra cola o tabla. El proyecto usa `org: diegoladrondeguevara`, la cuenta `904208419583` y únicamente `arn:aws:iam::904208419583:role/LabRole` como rol de ejecución; la plantilla no crea roles IAM.
 
 ## Despliegue en Bash o AWS CloudShell
 
@@ -18,6 +20,27 @@ bash deploy.sh --email otro-correo@ejemplo.com
 El script verifica la cuenta y consulta el tema, la cola y la tabla de la práctica. Si usas un perfil, añade `--profile nombre-del-perfil`; el stage predeterminado es `prod` y la región predeterminada es `us-east-1`. Los cambios de infraestructura se aplican con `serverless deploy`.
 
 `LabRole` debe permitir `sns:Publish` sobre `TemaSensorIoT`. Las credenciales de despliegue deben permitir CloudFormation, Lambda, EventBridge, SNS, S3 y `iam:PassRole` para `LabRole`.
+Para el consumidor, `LabRole` también debe permitir `sqs:ReceiveMessage`, `sqs:DeleteMessage`, `sqs:GetQueueAttributes` y `dynamodb:PutItem` sobre la cola y tabla existentes.
+
+### Actualizar el despliegue después del primer intento
+
+Si ya ejecutaste la versión inicial de este repositorio y confirmaste el correo, conserva la misma dirección al actualizar:
+
+```bash
+cd ~/cloud142
+git pull
+bash deploy.sh --email 'TU_CORREO_CONFIRMADO'
+```
+
+Comprueba que el nuevo desencadenador esté habilitado:
+
+```bash
+aws lambda list-event-source-mappings \
+  --function-name semana14-sesion2-InsertarSensor-prod \
+  --region us-east-1 \
+  --query 'EventSourceMappings[].[State,BatchSize,EventSourceArn]' \
+  --output table
+```
 
 **Confirma la suscripción** desde el enlace que SNS enviará al otro correo. Sin esa confirmación no llegará ningún aviso. El filtro nuevo puede tardar hasta 15 minutos en aplicarse por completo; [AWS documenta esta propagación](https://docs.aws.amazon.com/sns/latest/dg/sns-subscription-filter-policies.html).
 
@@ -34,7 +57,7 @@ aws lambda invoke \
 cat /tmp/lectura-temp.json
 ```
 
-Para ver las lecturas TEMP guardadas por el consumidor de clase:
+Para ver las lecturas TEMP guardadas por el consumidor nuevo:
 
 ```bash
 aws dynamodb scan \
