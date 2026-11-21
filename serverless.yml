@@ -1,0 +1,47 @@
+service: semana14-sesion2-sensor-temp
+org: diegoladrondeguevara
+frameworkVersion: '3'
+configValidationMode: error
+
+provider:
+  name: aws
+  runtime: python3.11
+  region: us-east-1
+  stage: prod
+  timeout: 20
+  memorySize: 128
+  iam:
+    role: arn:aws:iam::904208419583:role/LabRole
+  environment:
+    SENSOR_TOPIC_ARN: ${env:SENSOR_TOPIC_ARN}
+
+package:
+  patterns:
+    - '!**'
+    - handler.py
+
+functions:
+  generarSensorTemp:
+    name: semana14-sesion2-GenerarTEMP-${sls:stage}
+    handler: handler.lambda_handler
+    events:
+      - schedule: rate(1 minute)
+
+resources:
+  Resources:
+    CorreoSensorTemp:
+      Type: AWS::SNS::Subscription
+      Properties:
+        Protocol: email
+        Endpoint: ${env:SENSOR_ALERT_EMAIL}
+        TopicArn: ${env:SENSOR_TOPIC_ARN}
+        FilterPolicyScope: MessageAttributes
+        FilterPolicy:
+          tenant_id:
+            - FAB1
+          sensor_id:
+            - TEMP
+          medicion:
+            - numeric:
+                - '>'
+                - 40
